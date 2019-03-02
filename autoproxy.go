@@ -122,23 +122,28 @@ func handle(conn net.Conn) {
 
   log.Printf("use %s for %s\n", proxy.HostPort(), ua)
 
-  rconn, err := net.DialTimeout("tcp", proxy.HostPort(), time.Second * 10)
-  if err != nil {
-    log.Println(err)
-    b.proxy.Bad() // mark bad
+  // try 3 times
+  for try := 0; try < 3; try++ {
+    rconn, err := net.DialTimeout("tcp", proxy.HostPort(), time.Second * 10)
+    if err != nil {
+      log.Printf("try %d err %s\n", try, err)
+      continue
+    }
+    defer rconn.Close()
+
+    // TCP keep alive
+    ka, err := tcpkeepalive.EnableKeepAlive(rconn)
+    ka.SetKeepAliveIdle(time.Second * 30)
+    ka.SetKeepAliveCount(4)
+    ka.SetKeepAliveInterval(time.Second * 5)
+
+    rconn.Write(buf)
+
+    iocopy(conn, rconn)
     return
   }
-  defer rconn.Close()
-
-  // TCP keep alive
-  ka, err := tcpkeepalive.EnableKeepAlive(rconn)
-  ka.SetKeepAliveIdle(time.Second * 30)
-  ka.SetKeepAliveCount(4)
-  ka.SetKeepAliveInterval(time.Second * 5)
-
-  rconn.Write(buf)
-
-  iocopy(conn, rconn)
+  log.Printf("mark BAD %s\n", proxy.HostPort())
+  b.proxy.Bad() // mark bad
 }
 
 func main() {
