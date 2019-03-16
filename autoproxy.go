@@ -110,12 +110,13 @@ func handle(conn net.Conn) {
   }
 
   if b.proxy == nil || b.proxy.IsAlive() == false {
-    b.proxy = db.GetProxy()
-    if b.proxy == nil {
+    newproxy := db.GetProxy()
+    if newproxy == nil {
       // still nil, no proxy found
       log.Printf("no proxy for %s\n", ua)
       return
     }
+    b.proxy = newproxy
   }
 
   proxy := b.proxy.OpenProxy()
